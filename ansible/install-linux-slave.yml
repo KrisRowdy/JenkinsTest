@@ -1,0 +1,36 @@
+---
+- hosts: linux
+  become: yes
+  tasks:
+    - name: Install java
+      yum:
+        name: java-11-openjdk-devel
+        state: present
+
+    - name: Ensure group "jenkins" exists
+      ansible.builtin.group:
+        name: jenkins
+        state: present
+
+    - name: Add the user 'jenkins' with a  a primary group of 'jenkins'
+      ansible.builtin.user:
+        name: jenkins
+        comment: Jenkins
+        group: jenkins
+
+    - name: Copy agent.jar
+      ansible.builtin.copy:
+        src: /tmp/agent.jar
+        dest: /etc/foo.conf
+        owner: jenkins
+        group: jenkins
+        mode: '0644'
+
+    - name: Copy secret
+      ansible.builtin.copy:
+        src: /tmp/LinuxSecret.txt
+        dest: /home/jenkins
+        owner: jenkins
+        group: jenkins
+        mode: '0644'
+

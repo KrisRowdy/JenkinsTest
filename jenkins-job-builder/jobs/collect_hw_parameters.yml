@@ -1,0 +1,86 @@
+- job:
+    name: run_parameters_job
+    node: built-in
+    parameters:
+      - choice:
+          name: os
+          choices:
+            - both
+            - linux
+            - windows
+          description: "On which node run?"
+      - string:
+          name: branch
+          default: main
+    scm:
+      - git:
+          url: https://github.com/KrisRowdy/JenkinsTest.git
+          branches:
+            - ${branch} # or tag if specified in user input
+    triggers:
+      - pollscm: '* * * * *'
+    builders:
+      - conditional-step:
+          condition-kind: strings-match
+          condition-string1: "${os}"
+          condition-string2: "linux"
+          steps:
+            - trigger-builds:
+              - project:
+                - "fetch_linux_parameters"
+      - conditional-step:
+          condition-kind: strings-match
+          condition-string1: "${os}"
+          condition-string2: "windows"
+          steps:
+            - trigger-builds:
+                - project:
+                    - "fetch_windows_parameters"
+      - conditional-step:
+          condition-kind: strings-match
+          condition-string1: "${os}"
+          condition-string2: "both"
+          steps:
+            - trigger-builds:
+                - project:
+                    - "fetch_linux_parameters"
+                    - "fetch_windows_parameters"
+
+- job:
+    name: fetch_windows_parameters
+    description: 'Get node parameters'
+    project-type: freestyle
+    node: windows
+    builders:
+      - powershell: |
+          New-Item -Path ".\Parameters.txt"
+          echo "Hostname: $(hostname)" > .\Parameters.txt
+          echo "Operating System: $(Get-CimInstance Win32_OperatingSystem)" >> .\Parameters.txt
+          echo "CPU cores: $((Get-WmiObject Win32_Processor).NumberOfCores)" >> .\Parameters.txt
+          echo "RAM: $((Get-WmiObject -Class Win32_ComputerSystem).TotalPhysicalMemory)" >> .\Parameters.txt
+          echo "HDD size: $((Get-WmiObject Win32_LogicalDisk -Filter "DeviceID='C:'").Size)" >> .\Parameters.txt
+          echo "HDD disk usage: $(get-psdrive c | % { $_.used/($_.used + $_.free) } | % tostring p)" >> .\Parameters.txt
+          cat .\Parameters.txt
+    publishers:
+      - archive:
+          artifacts: 'Parameters.txt'
+
+- job:
+    name: fetch_linux_parameters
+    description: 'Get node parameters'
+    project-type: freestyle
+    node: linux
+    builders:
+      - shell: |
+            #!/bin/bash
+            touch Parameters.txt
+            echo "Hostname: "`hostname` > Parameters.txt
+            echo "Operating System: "`hostnamectl | grep "Operating System" | cut -d ' ' -f5-` >> Parameters.txt
+            echo "CPU cores: "`grep -c ^processor /proc/cpuinfo` >> Parameters.txt
+            echo "RAM: "`grep MemTotal /proc/meminfo | cut -d ' ' -f2-` >> Parameters.txt
+            echo "HDD size: "`lsblk -o MOUNTPOINT,SIZE | grep / | cut -d ' ' -f2-` >> Parameters.txt
+            echo "HDD disk usage: "`df -h / --output=pcent | tr -d '\n' | cut -d ' ' -f2-` >> Parameters.txt
+            cat Parameters.txt
+    publishers:
+      - archive:
+          artifacts: 'Parameters.txt'

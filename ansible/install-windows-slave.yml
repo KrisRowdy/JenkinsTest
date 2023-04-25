@@ -1,0 +1,36 @@
+---
+- hosts: linux
+  become: yes
+  tasks:
+    - name: Install Java
+      win_chocolatey:
+        name: oraclejdk
+        state: present
+        version: "17.0.2"
+
+    - name: Set Java_home
+      win_environment:
+        state: present
+        name: JAVA_HOME
+        value: 'c:\program files\java\jdk-17.0.2'
+        level: machine
+
+    - name: Add Java to path
+      win_path:
+        elements:
+          - 'c:\program files\java\jdk-17.0.2\bin'
+
+    - name: Create jenkins directory
+      ansible.windows.win_file:
+        path: c:\jenkins
+        state: directory
+
+    - name: Copy a single file
+      ansible.windows.win_copy:
+        src: /tmp/WindowsSecret.txt
+        dest: c:\jenkins
+
+    - name: Copy a single file
+      ansible.windows.win_copy:
+        src: /tmp/agent.jar
+        dest: c:\jenkins

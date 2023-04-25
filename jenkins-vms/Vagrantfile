@@ -1,0 +1,81 @@
+LIN_BOX_IMAGE = "almalinux/8"
+LIN_NODE_COUNT = 1
+WIN_BOX_IMAGE = "jacqinthebox/windowsserver2016"
+WIN_NODE_COUNT = 1
+
+$posh = <<-SCRIPT
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+$url = "https://raw.githubusercontent.com/jborean93/ansible-windows/master/scripts/Install-WMF3Hotfix.ps1"
+$file = "$env:temp\Install-WMF3Hotfix.ps1"
+(New-Object -TypeName System.Net.WebClient).DownloadFile($url, $file)
+powershell.exe -ExecutionPolicy ByPass -File $file
+SCRIPT
+
+$master = <<-SCRIPT
+mkdir -p "/etc/ansible/group_vars/win"
+export WIN_GROUP_VARS_FILE="/etc/ansible/group_vars/win/vars"
+sudo dnf update -y
+sudo dnf upgrade
+sudo dnf install epel-release -y
+sudo dnf module install python38 -y
+echo 3 | sudo alternatives --config python
+echo "---" >> $WIN_GROUP_VARS_FILE 
+echo "ansible_user: vagrant" >> $WIN_GROUP_VARS_FILE
+echo "ansible_password: vagrant" >> $WIN_GROUP_VARS_FILE
+echo "ansible_connection: winrm" >> $WIN_GROUP_VARS_FILE
+echo "ansible_winrm_server_cert_validation: ignore" >> $WIN_GROUP_VARS_FILE
+echo "ansible_port: 5986" >> $WIN_GROUP_VARS_FILE
+python -m pip install --upgrade pip
+python -m pip install setuptools_rust pywinrm ansible
+echo "[win]\n192.168.0.201\n192.168.0.202\n\n" >> /etc/ansible/hosts
+echo "[lin]\n192.168.0.21\n192.168.0.22\n192.168.0.100\n\n" >> /etc/ansible/hosts
+sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+sed -i 's/#host_key_checking = False/host_key_checking = False/g' /etc/ansible/ansible.cfg
+cd .ssh
+yes id_rsa |ssh-keygen -q -t rsa -N '' >/dev/null
+chown vagrant:vagrant id_rsa id_rsa.pub
+systemctl restart sshd
+SCRIPT
+
+$node = <<-SCRIPT
+export AUTH_KEYS="/home/vagrant/.ssh/authorized_keys"
+yum install sshpass -y
+echo $(sshpass -p vagrant ssh -oStrictHostKeyChecking=no vagrant@192.168.0.100 'echo $(cat /home/vagrant/.ssh/id_rsa.pub)') >> $AUTH_KEYS
+SCRIPT
+
+Vagrant.configure("2") do |config|
+  config.vm.define "master" do |subconfig|
+    subconfig.vm.box = LIN_BOX_IMAGE
+    subconfig.vm.hostname = "master"
+    subconfig.vm.network :private_network, ip: "192.168.0.100"
+    subconfig.vm.provision "shell", inline: $master
+    subconfig.vm.provision "shell", inline: $node
+    subconfig.vm.provider "virtualbox" do |v|
+      v.memory = 2084
+      v.cpus = 2
+    end
+  end
+
+  (1..WIN_NODE_COUNT).each do |i|
+    config.vm.define "win#{i}" do |subconfig|
+      subconfig.vm.box = WIN_BOX_IMAGE
+      subconfig.vm.communicator = "winrm"
+      subconfig.vm.hostname = "win#{i}"
+      subconfig.vm.network :private_network, ip: "192.168.0.#{i + 200}"
+      subconfig.vm.provision "shell", inline: $posh
+      subconfig.vm.provider "virtualbox" do |v|
+        v.memory = 2084
+        v.cpus = 2
+      end
+    end
+  end
+
+  (1..LIN_NODE_COUNT).each do |i|
+    config.vm.define "linux#{i}" do |subconfig|
+      subconfig.vm.box = LIN_BOX_IMAGE
+      subconfig.vm.hostname = "linux#{i}"
+      subconfig.vm.network :private_network, ip: "192.168.0.#{i + 20}"
+      subconfig.vm.provision "shell", inline: $node
+    end
+  end
+end
