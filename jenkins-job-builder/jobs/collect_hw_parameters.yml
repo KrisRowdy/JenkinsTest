@@ -1,6 +1,7 @@
 - job:
     name: run_parameters_job
     node: built-in
+    project-type: multijob
     parameters:
       - choice:
           name: os
@@ -41,10 +42,11 @@
           condition-string1: "${os}"
           condition-string2: "both"
           steps:
-            - trigger-builds:
-                - project:
-                    - "fetch_linux_parameters"
-                    - "fetch_windows_parameters"
+            - multijob:
+                name: ParalleljobsExecution
+                projects:
+                  - name: fetch_linux_parameters
+                  - name: fetch_windows_parameters
 
 - job:
     name: fetch_windows_parameters
