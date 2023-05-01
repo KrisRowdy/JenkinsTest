@@ -1,4 +1,5 @@
-###Overview###
+Overview
+--------
 Vagrant is used for  creating virtual machine using Virtualbox provider and install ansible on master's host. 
 Parameters allow to increase the amount of nodes if needed.
 Requirement for jenkins: (Minimum hardware requirements - can use as we need just run small project)
@@ -16,7 +17,7 @@ Conditional BuildStep;
 Parameterized Trigger plugin;
 PowerShell plugin.
 
-###Workflow implementation###
+Workflow implementation
 -----------------------
 Three jobs are created by Jenkins Job Builder:
 1. run_parameters_job - job that run on master node, clone the repo and run required job according to "os" parameter value.
@@ -24,7 +25,7 @@ scm specified for this job in order to avoid installation of Git to slave nodes.
 2. fetch_windows_parameters - job that run on windows node, run shell script for collect required parameters to file and publish it as job artifacts;
 3. fetch_linux_parameters - job that run on linux node, run powershell script for collect required parameters to file and publish it as job artifacts;
 
-###Instruction for deploy on Windows machine:###
+Instruction for deploy on Windows machine:
 ------------------------------------------
 Pre-requirements:
 Virtualbox, Vagrant installed
@@ -56,8 +57,8 @@ Put jenkins token to jenkins-job-builder/jenkins_jobs.ini
 cd jenkins-job-builder
 jenkins-jobs --conf ./jenkins_jobs.ini update jobs
 
-####TODO:####
-
+TODO:
+--------
 1. Try to use common job_template for creating fetch_windows_parameters and fetch_linux_parameters jobs.
 2. Add agent.jar as a windows service and systemd service to windows and linux playbooks accordingly.
 3. Put variables to separate files.
